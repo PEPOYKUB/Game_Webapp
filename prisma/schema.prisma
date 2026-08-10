@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  faculty      String?
+  year         Int?
+  createdAt    DateTime      @default(now())
+  sessions     GameSession[]
+  attempts     Attempt[]
+  hints        HintUsage[]
+}
+
+model GameSession {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score        Int       @default(500)
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  attempts     Attempt[]
+}
+
+model Attempt {
+  id          String      @id @default(cuid())
+  userId      String
+  sessionId   String
+  stageId     Int
+  answer      String
+  correct     Boolean
+  elapsedMs   Int?
+  createdAt   DateTime    @default(now())
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model HintUsage {
+  id          String   @id @default(cuid())
+  userId      String
+  sessionId   String
+  stageId     Int
+  level       Int
+  penalty     Int      @default(25)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
