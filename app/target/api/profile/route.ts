@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getFlag } from "@/lib/flags";
 
 const profiles: Record<string, Record<string, string>> = {
   "student-001": { id: "student-001", name: "Narin S.", faculty: "Engineering", year: "2" },
-  "admin-001": { id: "admin-001", name: "Portal Administrator", faculty: "College of Computing", year: "—", flag: "FLAG{PARAM-ROLE-ADMIN-001}" },
+  "admin-001": { id: "admin-001", name: "Portal Administrator", faculty: "College of Computing", year: "—", flag: getFlag("param") },
 };
 
 export function GET(request: NextRequest) {

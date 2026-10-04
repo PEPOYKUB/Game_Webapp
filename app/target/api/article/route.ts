@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getFlag } from "@/lib/flags";
 
 const articles: Record<string, Record<string, string>> = {
   "101": { id: "101", title: "KKU opens new digital library", body: "The library will open next semester.", author: "KKU News" },
-  "102": { id: "102", title: "Internal incident report", body: "Restricted: unauthorized access detected in the student portal.", author: "Security Office", flag: "FLAG{IDOR-ARTICLE-102}" },
+  "102": { id: "102", title: "Internal incident report", body: "Restricted: unauthorized access detected in the student portal.", author: "Security Office", flag: getFlag("idor") },
   "103": { id: "103", title: "Computing Fair 2026", body: "Students can register from today.", author: "College of Computing" },
 };
 
