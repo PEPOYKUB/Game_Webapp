@@ -1,6 +1,18 @@
 node_modules/
 .next/
 out/
+
+# Secrets — never commit real values (.env.example holds names only)
 .env
-.env*.local
+.env.*
+!.env.example
+
+# Answer keys / write-ups
+SOLUTIONS*.md
+*.private.md
+
 *.log
+*.tsbuildinfo
+
+# Local tooling
+.claude/
