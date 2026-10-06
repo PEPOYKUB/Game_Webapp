@@ -1,54 +1,219 @@
+// CyberEscape KKU — 14-table domain model (see Domain Model PDF).
+// Table/column names follow the ER diagram (snake_case); Prisma models use camelCase.
+// Extra CHECK constraints live in the migration SQL (Prisma cannot express them).
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  name         String?
-  faculty      String?
-  year         Int?
-  createdAt    DateTime      @default(now())
+model Faculty {
+  facultyId     Int       @id(map: "pk_faculty") @default(autoincrement()) @map("faculty_id")
+  facultyCode   String    @unique(map: "uq_faculty_code") @map("faculty_code") @db.VarChar(20)
+  facultyNameTh String    @map("faculty_name_th") @db.VarChar(100)
+  facultyNameEn String    @map("faculty_name_en") @db.VarChar(100)
+  users         AppUser[]
+
+  @@map("faculty")
+}
+
+model AppUser {
+  userId       Int               @id(map: "pk_app_user") @default(autoincrement()) @map("user_id")
+  username     String            @unique(map: "uq_app_user_username") @db.VarChar(50)
+  email        String            @unique(map: "uq_app_user_email") @db.VarChar(254)
+  passwordHash String            @map("password_hash") @db.VarChar(255)
+  firstName    String            @map("first_name") @db.VarChar(50)
+  lastName     String            @map("last_name") @db.VarChar(50)
+  studentId    String?           @unique(map: "uq_app_user_student_id") @map("student_id") @db.VarChar(20)
+  yearLevel    Int?              @map("year_level") @db.SmallInt
+  role         String            @default("PLAYER") @db.VarChar(20)
+  status       String            @default("ACTIVE") @db.VarChar(20)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  facultyId    Int?              @map("faculty_id")
+  faculty      Faculty?          @relation(fields: [facultyId], references: [facultyId], onDelete: SetNull, map: "fk_app_user_faculty")
   sessions     GameSession[]
-  attempts     Attempt[]
-  hints        HintUsage[]
+  roomsCreated Room[]
+  achievements UserAchievement[]
+
+  @@index([facultyId], map: "ix_app_user_faculty")
+  @@map("app_user")
+}
+
+model Room {
+  roomId          Int            @id(map: "pk_room") @default(autoincrement()) @map("room_id")
+  roomCode        String         @unique(map: "uq_room_code") @map("room_code") @db.VarChar(20)
+  roomName        String         @map("room_name") @db.VarChar(100)
+  description     String?        @db.VarChar(1000)
+  difficultyLevel String         @map("difficulty_level") @db.VarChar(20)
+  isActive        Boolean        @default(true) @map("is_active")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  createdBy       Int?           @map("created_by")
+  creator         AppUser?       @relation(fields: [createdBy], references: [userId], onDelete: SetNull, map: "fk_room_created_by")
+  stages          Stage[]
+  sessions        GameSession[]
+  categories      RoomCategory[]
+
+  @@index([createdBy], map: "ix_room_created_by")
+  @@map("room")
+}
+
+model Category {
+  categoryId          Int            @id(map: "pk_category") @default(autoincrement()) @map("category_id")
+  categoryName        String         @unique(map: "uq_category_name") @map("category_name") @db.VarChar(50)
+  categoryDescription String?        @map("category_description") @db.VarChar(255)
+  rooms               RoomCategory[]
+
+  @@map("category")
+}
+
+model RoomCategory {
+  roomId     Int      @map("room_id")
+  categoryId Int      @map("category_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  room       Room     @relation(fields: [roomId], references: [roomId], onDelete: Cascade, map: "fk_room_category_room")
+  category   Category @relation(fields: [categoryId], references: [categoryId], onDelete: Cascade, map: "fk_room_category_category")
+
+  @@id([roomId, categoryId], map: "pk_room_category")
+  @@map("room_category")
+}
+
+model Stage {
+  stageId       Int             @id(map: "pk_stage") @default(autoincrement()) @map("stage_id")
+  roomId        Int             @map("room_id")
+  stageNumber   Int             @map("stage_number")
+  stageName     String          @map("stage_name") @db.VarChar(100)
+  storylineText String?         @map("storyline_text") @db.VarChar(2000)
+  maxScore      Int             @map("max_score")
+  room          Room            @relation(fields: [roomId], references: [roomId], onDelete: Cascade, map: "fk_stage_room")
+  puzzles       Puzzle[]
+  progress      StageProgress[]
+
+  @@unique([roomId, stageNumber], map: "uq_stage_room_number")
+  @@map("stage")
+}
+
+model Puzzle {
+  puzzleId          Int             @id(map: "pk_puzzle") @default(autoincrement()) @map("puzzle_id")
+  stageId           Int             @map("stage_id")
+  puzzleTitle       String          @map("puzzle_title") @db.VarChar(100)
+  questionText      String          @map("question_text") @db.VarChar(2000)
+  puzzleType        String          @map("puzzle_type") @db.VarChar(30)
+  // HMAC-SHA256(FLAG_SECRET, normalized flag) — never the flag itself, never sent to the client.
+  correctAnswerHash String          @map("correct_answer_hash") @db.VarChar(255)
+  explanationText   String?         @map("explanation_text") @db.VarChar(1000)
+  stage             Stage           @relation(fields: [stageId], references: [stageId], onDelete: Cascade, map: "fk_puzzle_stage")
+  hints             Hint[]
+  attempts          PuzzleAttempt[]
+
+  @@index([stageId], map: "ix_puzzle_stage")
+  @@map("puzzle")
+}
+
+model Hint {
+  hintId         Int         @id(map: "pk_hint") @default(autoincrement()) @map("hint_id")
+  puzzleId       Int         @map("puzzle_id")
+  hintLevel      Int         @map("hint_level") @db.SmallInt
+  hintText       String      @map("hint_text") @db.VarChar(1000)
+  deductionScore Int         @map("deduction_score") @db.SmallInt
+  puzzle         Puzzle      @relation(fields: [puzzleId], references: [puzzleId], onDelete: Cascade, map: "fk_hint_puzzle")
+  usages         HintUsage[]
+
+  @@unique([puzzleId, hintLevel], map: "uq_hint_puzzle_level")
+  @@map("hint")
 }
 
 model GameSession {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  score        Int       @default(500)
-  startedAt    DateTime  @default(now())
-  completedAt  DateTime?
-  attempts     Attempt[]
+  sessionId  Int             @id(map: "pk_game_session") @default(autoincrement()) @map("session_id")
+  userId     Int             @map("user_id")
+  roomId     Int             @map("room_id")
+  startedAt  DateTime        @default(now()) @map("started_at")
+  endedAt    DateTime?       @map("ended_at")
+  status     String          @default("ACTIVE") @db.VarChar(20)
+  finalScore Int             @default(0) @map("final_score")
+  user       AppUser         @relation(fields: [userId], references: [userId], onDelete: Cascade, map: "fk_game_session_user")
+  room       Room            @relation(fields: [roomId], references: [roomId], onDelete: Restrict, map: "fk_game_session_room")
+  progress   StageProgress[]
+  attempts   PuzzleAttempt[]
+  hintUsages HintUsage[]
+
+  @@index([userId, roomId], map: "ix_game_session_user_room")
+  @@index([roomId, status], map: "ix_game_session_room_status")
+  @@map("game_session")
 }
 
-model Attempt {
-  id          String      @id @default(cuid())
-  userId      String
-  sessionId   String
-  stageId     Int
-  answer      String
-  correct     Boolean
-  elapsedMs   Int?
-  createdAt   DateTime    @default(now())
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session     GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+model StageProgress {
+  progressId  Int         @id(map: "pk_stage_progress") @default(autoincrement()) @map("progress_id")
+  sessionId   Int         @map("session_id")
+  stageId     Int         @map("stage_id")
+  status      String      @default("LOCKED") @db.VarChar(20)
+  scoreEarned Int         @default(0) @map("score_earned")
+  startedAt   DateTime?   @map("started_at")
+  completedAt DateTime?   @map("completed_at")
+  session     GameSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade, map: "fk_stage_progress_session")
+  stage       Stage       @relation(fields: [stageId], references: [stageId], onDelete: Cascade, map: "fk_stage_progress_stage")
+
+  @@unique([sessionId, stageId], map: "uq_progress_session_stage")
+  @@index([stageId], map: "ix_stage_progress_stage")
+  @@map("stage_progress")
+}
+
+model PuzzleAttempt {
+  attemptId       Int         @id(map: "pk_puzzle_attempt") @default(autoincrement()) @map("attempt_id")
+  sessionId       Int         @map("session_id")
+  puzzleId        Int         @map("puzzle_id")
+  // Correct answers are stored redacted so the database never holds a valid flag.
+  submittedAnswer String      @map("submitted_answer") @db.VarChar(1000)
+  isCorrect       Boolean     @map("is_correct")
+  attemptedAt     DateTime    @default(now()) @map("attempted_at")
+  session         GameSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade, map: "fk_puzzle_attempt_session")
+  puzzle          Puzzle      @relation(fields: [puzzleId], references: [puzzleId], onDelete: Restrict, map: "fk_puzzle_attempt_puzzle")
+
+  @@index([sessionId], map: "ix_puzzle_attempt_session")
+  @@index([puzzleId], map: "ix_puzzle_attempt_puzzle")
+  @@map("puzzle_attempt")
 }
 
 model HintUsage {
-  id          String   @id @default(cuid())
-  userId      String
-  sessionId   String
-  stageId     Int
-  level       Int
-  penalty     Int      @default(25)
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hintUsageId   Int         @id(map: "pk_hint_usage") @default(autoincrement()) @map("hint_usage_id")
+  sessionId     Int         @map("session_id")
+  hintId        Int         @map("hint_id")
+  usedAt        DateTime    @default(now()) @map("used_at")
+  scoreDeducted Int         @map("score_deducted") @db.SmallInt
+  session       GameSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade, map: "fk_hint_usage_session")
+  hint          Hint        @relation(fields: [hintId], references: [hintId], onDelete: Restrict, map: "fk_hint_usage_hint")
+
+  // Not in the ER diagram's index list, but stops the same hint being charged twice in one session.
+  @@unique([sessionId, hintId], map: "uq_hint_usage_session_hint")
+  @@index([sessionId], map: "ix_hint_usage_session")
+  @@index([hintId], map: "ix_hint_usage_hint")
+  @@map("hint_usage")
+}
+
+model Achievement {
+  achievementId     Int               @id(map: "pk_achievement") @default(autoincrement()) @map("achievement_id")
+  achievementCode   String            @unique(map: "uq_achievement_code") @map("achievement_code") @db.VarChar(30)
+  achievementName   String            @map("achievement_name") @db.VarChar(100)
+  description       String?           @db.VarChar(500)
+  badgeIconUrl      String?           @map("badge_icon_url") @db.VarChar(255)
+  criteriaCondition String?           @map("criteria_condition") @db.VarChar(500)
+  users             UserAchievement[]
+
+  @@map("achievement")
+}
+
+model UserAchievement {
+  userId        Int         @map("user_id")
+  achievementId Int         @map("achievement_id")
+  unlockedAt    DateTime    @default(now()) @map("unlocked_at")
+  user          AppUser     @relation(fields: [userId], references: [userId], onDelete: Cascade, map: "fk_user_achievement_user")
+  achievement   Achievement @relation(fields: [achievementId], references: [achievementId], onDelete: Cascade, map: "fk_user_achievement_achievement")
+
+  @@id([userId, achievementId], map: "pk_user_achievement")
+  @@index([achievementId], map: "ix_user_achievement_achievement")
+  @@map("user_achievement")
 }
