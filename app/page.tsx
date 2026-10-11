@@ -168,6 +168,7 @@ function Shell({ children, user, onRules, onReset, resetBusy }: { children: Reac
     <header className="answer-nav"><a href="/" className="answer-logo"><span>01</span><div>BREACH / RESPONSE<small>SECURITY AWARENESS CHALLENGE</small></div></a><nav className="answer-links">
       {user ? <span>PLAYER: {user.username.toUpperCase()}</span> : <span>PLAYER: GUEST</span>}
       <a href="/leaderboard">LEADERBOARD</a>
+      {user && <a href="/profile">PROFILE</a>}
       {onRules && <button className="nav-action" onClick={onRules}>HOW TO PLAY</button>}
       {onReset && <button className="nav-action reset" onClick={onReset} disabled={resetBusy}>{resetBusy ? "RESETTING…" : "RESET GAME"}</button>}
       {user?.role === ROLE.admin && <a href="/admin">ADMIN ↗</a>}
