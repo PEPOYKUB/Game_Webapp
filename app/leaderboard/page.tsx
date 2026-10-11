@@ -15,7 +15,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
     <header className="answer-nav"><a href="/" className="answer-logo"><span>01</span><div>BREACH / RESPONSE<small>SECURITY AWARENESS CHALLENGE</small></div></a><nav className="answer-links"><a href="/">← BACK TO GAME</a>{!user && <a href="/login">LOGIN</a>}</nav></header>
     <section className="answer-intro compact"><p className="answer-kicker">HALL OF FAME / BEST COMPLETED RUNS</p><h1>Leader<i>board.</i></h1><p>อันดับคิดจากคะแนนสูงสุด แล้วจึงดูเวลาที่ใช้น้อยที่สุด · หนึ่งแถวต่อผู้เล่นต่อห้อง</p></section>
     <StatsFilters options={options} filters={filters} action="/leaderboard" />
-    <LeaderboardTable rows={rows} />
+    <LeaderboardTable rows={rows} currentUsername={user?.username} />
     <footer className="answer-footer"><span>BREACH / RESPONSE</span><span>CONTROLLED EDUCATIONAL SIMULATION — NO REAL TARGETS</span></footer>
   </main>;
 }

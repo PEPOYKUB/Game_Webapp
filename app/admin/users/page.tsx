@@ -27,7 +27,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Recor
         <tbody>{result.users.map(u => {
           const self = u.userId === admin.userId;
           return <tr key={u.userId}>
-            <td><b>{u.username}</b>{self && <small> (you)</small>}</td><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td>{u.studentId ?? "—"}</td><td>{u.faculty ?? "—"}</td><td className="num">{u.yearLevel ?? "—"}</td>
+            <td><a className="user-name-link" href={`/admin/users/${u.userId}`}><b>{u.username}</b></a>{self && <small> (you)</small>}</td><td>{u.firstName} {u.lastName}</td><td>{u.email}</td><td>{u.studentId ?? "—"}</td><td>{u.faculty ?? "—"}</td><td className="num">{u.yearLevel ?? "—"}</td>
             <td><Badge tone={u.role === ROLE.admin ? "warn" : "neutral"}>{u.role}</Badge></td><td><Badge tone={u.status === USER_STATUS.active ? "good" : "bad"}>{u.status}</Badge></td>
             <td className="num">{u.completed}/{u.sessions}</td><td className="num">{u.bestScore ?? "—"}</td><td className="num">{u.achievements}</td><td>{formatDateTime(u.createdAt)}</td>
             <td className="actions">{!self && <>

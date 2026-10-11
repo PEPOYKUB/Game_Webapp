@@ -6,6 +6,26 @@
 
 ## Quick start
 
+### Docker (แนะนำสำหรับเครื่อง Demo)
+
+ต้องติดตั้งและเปิด Docker Desktop จากนั้นรัน:
+
+```bash
+docker compose up --build
+```
+
+เปิดเว็บที่ <http://localhost:3002> · Compose จะเริ่ม PostgreSQL, รัน migrations และ seed ห้องตัวอย่างให้อัตโนมัติ ฐานข้อมูลเก็บใน Docker volume `postgres_data` และ source code จะ mount เพื่อให้ hot reload ทำงาน
+
+หยุดด้วย `Ctrl+C` แล้วรัน `docker compose down` เมื่อต้องการปิด services · ข้อมูลฐานข้อมูลยังอยู่ใน volume; ใช้ `docker compose down -v` เฉพาะเมื่อต้องการลบข้อมูล demo ทั้งหมด
+
+ค่า secret ใน Compose ใช้สำหรับเครื่อง demo ภายในเท่านั้น ห้ามใช้ค่าเหล่านี้ใน production
+
+เตรียมบัญชีผู้เล่นสำหรับนำเสนอด้วย `docker compose exec app npm run db:demo` (หลังฐานข้อมูล seed แล้ว) · ขั้นตอนนำเสนอและ SQL ตรวจผลอยู่ใน [docs/DEMO.md](docs/DEMO.md)
+
+เพิ่มห้อง Database Quest (5 ด่าน) แยกจาก seed หลักด้วย `docker compose exec app npm run db:subjects` หลังฐานข้อมูลพร้อมแล้ว
+
+### รันบนเครื่องโดยตรง
+
 ต้องมี Node.js 18.18+ และ PostgreSQL 13+
 
 ```bash
@@ -135,6 +155,7 @@ lib/flags.ts                    Flag + answer hash (server-only)
 lib/stats.ts, lib/admin.ts      Leaderboard / analytics / admin queries
 lib/validation.ts               Input validation ทุก API
 prisma/schema.prisma            14-table model · prisma/seed.ts ข้อมูลตัวอย่าง
+docs/DEMO.md                    runbook นำเสนอ, บัญชีสาธิต และ SQL ตรวจผลก่อน/หลัง
 ```
 
 ## Stack

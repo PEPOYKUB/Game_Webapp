@@ -54,6 +54,43 @@ export async function listUsers(params: Params) {
   };
 }
 
+/** Full admin-safe view of one user. Sensitive fields such as password_hash are never selected. */
+export async function getUserDetail(userId: number) {
+  const user = await db.appUser.findUnique({
+    where: { userId },
+    select: { userId: true, username: true, email: true, firstName: true, lastName: true, studentId: true, yearLevel: true, role: true, status: true, createdAt: true, faculty: { select: { facultyCode: true, facultyNameTh: true, facultyNameEn: true } } },
+  });
+  if (!user) return null;
+
+  const [sessions, progress, attempts, hints, achievements] = await Promise.all([
+    db.gameSession.findMany({ where: { userId }, orderBy: { startedAt: "desc" }, select: { sessionId: true, status: true, finalScore: true, startedAt: true, endedAt: true, room: { select: { roomCode: true, roomName: true } } } }),
+    db.stageProgress.findMany({ where: { session: { userId } }, orderBy: [{ sessionId: "desc" }, { stage: { stageNumber: "asc" } }], select: { sessionId: true, status: true, scoreEarned: true, startedAt: true, completedAt: true, stage: { select: { stageNumber: true, stageName: true } } } }),
+    db.puzzleAttempt.findMany({
+      where: { session: { userId } }, orderBy: { attemptedAt: "desc" },
+      select: { attemptId: true, sessionId: true, submittedAnswer: true, isCorrect: true, attemptedAt: true, puzzle: { select: { puzzleTitle: true, stage: { select: { stageNumber: true, room: { select: { roomCode: true } } } } } } },
+    }),
+    db.hintUsage.findMany({
+      where: { session: { userId } }, orderBy: { usedAt: "desc" },
+      select: {
+        hintUsageId: true, sessionId: true, usedAt: true, scoreDeducted: true,
+        hint: {
+          select: {
+            hintLevel: true,
+            puzzle: {
+              select: {
+                puzzleTitle: true,
+                stage: { select: { stageNumber: true, room: { select: { roomCode: true } } } },
+              },
+            },
+          },
+        },
+      },
+    }),
+    db.userAchievement.findMany({ where: { userId }, orderBy: { unlockedAt: "desc" }, select: { unlockedAt: true, achievement: { select: { achievementCode: true, achievementName: true, description: true, badgeIconUrl: true } } } }),
+  ]);
+  return { ...user, sessions: sessions.map(session => ({ ...session, progress: progress.filter(item => item.sessionId === session.sessionId), attempts: attempts.filter(item => item.sessionId === session.sessionId), hintUsages: hints.filter(item => item.sessionId === session.sessionId) })), achievements };
+}
+
 export async function listSessions(params: Params) {
   const status = param(params, "status");
   const roomId = positiveInt(param(params, "roomId"));

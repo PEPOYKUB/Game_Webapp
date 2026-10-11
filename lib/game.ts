@@ -53,12 +53,14 @@ export async function getGameView(userId: number, requestedRoomId?: number | nul
   const achievementView = achievements.map(a => ({ code: a.achievementCode, name: a.achievementName, description: a.description, icon: a.badgeIconUrl, unlockedAt: a.users[0]?.unlockedAt ?? null }));
   if (!room) return { rooms: roomList, room: null, session: null, stages: [], stats: null, achievements: achievementView };
 
-  // Latest session that was not thrown away: the running one, or the last finished one (summary screen).
-  const session = await db.gameSession.findFirst({
-    where: { userId, roomId: room.roomId, status: { not: SESSION_STATUS.abandoned } },
+  // The latest run determines this view. An abandoned latest run intentionally returns the room briefing,
+  // rather than resurfacing an older completed summary after the player resets.
+  const latestSession = await db.gameSession.findFirst({
+    where: { userId, roomId: room.roomId },
     orderBy: { startedAt: "desc" },
     include: { progress: true, attempts: { select: { puzzleId: true, isCorrect: true } }, hintUsages: { select: { hintId: true, scoreDeducted: true } } },
   });
+  const session = latestSession?.status === SESSION_STATUS.abandoned ? null : latestSession;
 
   const solvedPuzzles = new Set(session?.attempts.filter(a => a.isCorrect).map(a => a.puzzleId));
   const usedHints = new Set(session?.hintUsages.map(h => h.hintId));
@@ -134,6 +136,20 @@ export async function startSession(userId: number, { roomId = null, restart = fa
     if (!active) throw error;
     return { ok: true, data: { sessionId: active.sessionId, roomId: room.roomId } };
   }
+}
+
+/** Abandons the active run for a room without creating a replacement session. */
+export async function abandonSession(userId: number, roomId: number): Promise<Result<{ roomId: number }>> {
+  const room = await getPlayableRoom(roomId);
+  if (!room || room.roomId !== roomId) return fail(404, "That room is not open");
+  await db.$transaction(async tx => {
+    const active = await findActiveSession(tx, userId, roomId);
+    if (active) await tx.gameSession.update({
+      where: { sessionId: active.sessionId },
+      data: { status: SESSION_STATUS.abandoned, endedAt: new Date() },
+    });
+  });
+  return { ok: true, data: { roomId } };
 }
 
 function createSession(userId: number, room: { roomId: number; stages: { stageId: number }[] }, now: Date, restart: boolean): Promise<Result<{ sessionId: number; roomId: number }>> {

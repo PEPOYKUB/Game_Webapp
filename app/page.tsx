@@ -60,6 +60,7 @@ export default function AnswerWeb() {
 
   const user = game.user;
   const stages = game.stages;
+  const isDatabaseQuest = game.room?.code === "KKU-DB-QUEST-01";
   const stage = stages[Math.min(active, Math.max(0, stages.length - 1))];
   const puzzle = stage?.puzzles[0];
   const finished = session?.status === SESSION_STATUS.completed;
@@ -75,6 +76,17 @@ export default function AnswerWeb() {
     await refresh(result.data.roomId, true);
   }
 
+  async function resetGame() {
+    if (!roomId || !running) return;
+    if (!confirm("Reset this run? It will be marked as abandoned. You'll return to this room's briefing and can start a fresh run there.")) return;
+    setBusy(true);
+    const result = await api<{ roomId: number }>("/api/game/start", { roomId, abandon: true });
+    setBusy(false);
+    if (!result.ok) { setMessage(result.data.error ?? "Could not reset the game"); return; }
+    setValue(""); setStatus("idle"); setMessage("");
+    await refresh(result.data.roomId, true);
+  }
+
   function choose(index: number) {
     if (stages[index]?.status === PROGRESS_STATUS.locked) return;
     setActive(index); setValue(""); setStatus("idle"); setMessage("");
@@ -87,7 +99,9 @@ export default function AnswerWeb() {
     if (!result.ok) { setStatus("error"); setMessage(result.data.error ?? "Could not reach the flag checker"); return; }
     setStatus(result.data.correct ? "correct" : "wrong");
     if (result.data.newAchievements?.length) setToast(result.data.newAchievements);
-    if (result.data.correct) { setValue(""); await refresh(); }
+    if (result.data.correct) setValue("");
+    // Wrong answers are persisted too; refresh the server-owned attempt count and score after every accepted request.
+    await refresh();
   }
 
   async function openHint(level: number, deduction: number) {
@@ -105,8 +119,8 @@ export default function AnswerWeb() {
     await refresh(next, true);
   }
 
-  return <Shell user={user} onRules={() => setShowRules(true)} onReset={running ? () => start(true) : undefined}>
-    <section className="answer-intro"><p className="answer-kicker">MISSION CONTROL / {game.room ? `${game.room.code} · ${game.room.difficulty}` : "NO ROOM"}</p><h1>Find it.<br /><i>Prove it.</i></h1><p>คำตอบที่ถูกต้องไม่ได้อยู่ในหน้านี้<br />เปิด Target Website แล้วค้นหาหลักฐานจาก API</p><a className="target-button" href="/target" target="_blank" rel="noreferrer">GO TO TARGET WEBSITE <span>↗</span></a></section>
+  return <Shell user={user} onRules={() => setShowRules(true)} onReset={running ? resetGame : undefined} resetBusy={busy}>
+    <section className="answer-intro"><div className="intro-copy"><p className="answer-kicker">MISSION CONTROL / {game.room ? `${game.room.code} · ${game.room.difficulty}` : "NO ROOM"}</p><h1>{isDatabaseQuest ? "Query it." : "Find it."}<br /><i>Prove it.</i></h1><p>{isDatabaseQuest ? "ใช้ความรู้ฐานข้อมูลแก้โจทย์ทีละด่าน" : "คำตอบที่ถูกต้องไม่ได้อยู่ในหน้านี้"}<br />{isDatabaseQuest ? "ตอบด้วยคำสั้น ๆ แล้วดูคำอธิบายหลังผ่าน" : "เปิด Target Website แล้วค้นหาหลักฐานจาก API"}</p>{!isDatabaseQuest && <a className="target-button" href="/target" target="_blank" rel="noreferrer">GO TO TARGET WEBSITE <span>↗</span></a>}</div><div className="hero-visual"><img src="/hero-breach.svg" alt="" /></div></section>
 
     {game.rooms.length > 1 && <div className="room-picker"><span className="answer-kicker">ROOM</span>{game.rooms.map(r => <button key={r.roomId} className={r.roomId === game.room?.roomId ? "active" : ""} onClick={() => switchRoom(r.roomId)}>{r.name}<small>{r.code} · {r.difficulty}</small></button>)}</div>}
 
@@ -117,11 +131,11 @@ export default function AnswerWeb() {
         <aside className="challenge-nav"><div className="answer-section-label">CHALLENGES <b>{String(stages.length).padStart(2, "0")}</b></div>{stages.map((item, index) => {
           const locked = item.status === PROGRESS_STATUS.locked; const done = item.status === PROGRESS_STATUS.completed;
           return <button key={item.stageId} className={[active === index ? "active" : "", locked ? "locked" : "", done ? "done" : ""].join(" ").trim()} disabled={locked} aria-current={active === index} onClick={() => choose(index)}><span>{String(item.number).padStart(2, "0")}</span><div><b>{locked ? "Locked challenge" : item.puzzles[0]?.title ?? item.name}</b><small>{item.name}</small></div><em>{done ? "✓ SOLVED" : locked ? "LOCKED" : active === index ? "OPEN" : ""}</em></button>;
-        })}<div className="rules"><span>HOW TO PLAY</span><ol><li>เปิด Target Website</li><li>ใช้ DevTools / Network</li><li>หา Flag จาก API</li><li>นำ Flag กลับมาตอบ</li></ol></div></aside>
+        })}<div className="rules"><span>HOW TO PLAY</span><ol>{isDatabaseQuest ? <><li>อ่านโจทย์แนวฐานข้อมูล</li><li>วิเคราะห์แนวคิดหรือ SQL</li><li>ขอ Hint ได้เมื่อจำเป็น</li><li>ส่งคำตอบสั้น ๆ</li></> : <><li>เปิด Target Website</li><li>ใช้ DevTools / Network</li><li>หา Flag จาก API</li><li>นำ Flag กลับมาตอบ</li></>}</ol></div></aside>
 
-        {stage && puzzle ? <section className="question-panel"><div className="question-meta"><span>{stage.name}</span><span>QUESTION {String(stage.number).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span></div><h2>{puzzle.title}</h2><p className="question-text">{puzzle.question}</p>{stage.objective && <div className="objective"><span>OBJECTIVE</span><b>{stage.objective}</b></div>}
-          <label htmlFor="flag-input">SUBMIT FLAG <small>CASE SENSITIVE: NO</small></label>
-          <div className="flag-input"><input id="flag-input" value={value} disabled={puzzle.solved} maxLength={200} autoComplete="off" onChange={e => { setValue(e.target.value); setStatus("idle"); }} onKeyDown={e => e.key === "Enter" && submit()} placeholder={puzzle.solved ? "Challenge complete" : "FLAG{...}"} /><button onClick={submit} disabled={puzzle.solved || status === "checking"}>{status === "checking" ? "CHECKING..." : "SUBMIT"}</button></div>
+        {stage && puzzle ? <section className="question-panel"><div className="question-meta"><span>{stage.name}</span><span>QUESTION {String(stage.number).padStart(2, "0")} / {String(stages.length).padStart(2, "0")}</span></div><h2>{puzzle.title}</h2><p className="question-text">{puzzle.question}</p>{stage.objective && !isDatabaseQuest && <div className="objective"><span>OBJECTIVE</span><b>{stage.objective}</b></div>}
+          <label htmlFor="flag-input">{isDatabaseQuest ? "SUBMIT ANSWER" : "SUBMIT FLAG"} <small>CASE SENSITIVE: NO</small></label>
+          <div className="flag-input"><input id="flag-input" value={value} disabled={puzzle.solved} maxLength={200} autoComplete="off" onChange={e => { setValue(e.target.value); setStatus("idle"); }} onKeyDown={e => e.key === "Enter" && submit()} placeholder={puzzle.solved ? "Challenge complete" : isDatabaseQuest ? "Type your answer" : "FLAG{...}"} /><button onClick={submit} disabled={puzzle.solved || status === "checking"}>{status === "checking" ? "CHECKING..." : "SUBMIT"}</button></div>
           <div aria-live="polite">
             {puzzle.solved && status !== "correct" && <div className="answer-status correct">✓ Already solved · +{stage.scoreEarned} pts</div>}
             {status === "correct" && <div className="answer-status correct">✓ FLAG ACCEPTED — challenge complete{active < stages.length - 1 && <button className="next-challenge" onClick={() => choose(active + 1)}>NEXT CHALLENGE →</button>}</div>}
@@ -141,11 +155,11 @@ export default function AnswerWeb() {
       </div>}
 
     {toast.length > 0 && <div className="toast" role="status"><b>ACHIEVEMENT UNLOCKED</b>{toast.map(name => <span key={name}>★ {name}</span>)}<button onClick={() => setToast([])} aria-label="Dismiss">×</button></div>}
-    {showRules && <HowToPlay onClose={() => setShowRules(false)} />}
+    {showRules && <HowToPlay onClose={() => setShowRules(false)} databaseQuest={isDatabaseQuest} />}
   </Shell>;
 }
 
-function Shell({ children, user, onRules, onReset }: { children: React.ReactNode; user?: { username: string; role: string }; onRules?: () => void; onReset?: () => void }) {
+function Shell({ children, user, onRules, onReset, resetBusy }: { children: React.ReactNode; user?: { username: string; role: string }; onRules?: () => void; onReset?: () => void; resetBusy?: boolean }) {
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/";
@@ -155,7 +169,7 @@ function Shell({ children, user, onRules, onReset }: { children: React.ReactNode
       {user ? <span>PLAYER: {user.username.toUpperCase()}</span> : <span>PLAYER: GUEST</span>}
       <a href="/leaderboard">LEADERBOARD</a>
       {onRules && <button className="nav-action" onClick={onRules}>HOW TO PLAY</button>}
-      {onReset && <button className="nav-action reset" onClick={onReset}>RESET GAME</button>}
+      {onReset && <button className="nav-action reset" onClick={onReset} disabled={resetBusy}>{resetBusy ? "RESETTING…" : "RESET GAME"}</button>}
       {user?.role === ROLE.admin && <a href="/admin">ADMIN ↗</a>}
       {user ? <button className="nav-action" onClick={logout}>LOGOUT</button> : <><a href="/login">LOGIN</a><a href="/register">REGISTER</a></>}
     </nav></header>
@@ -166,7 +180,7 @@ function Shell({ children, user, onRules, onReset }: { children: React.ReactNode
 
 function GuestIntro() {
   return <>
-    <section className="answer-intro"><p className="answer-kicker">MISSION CONTROL / SIGN IN TO PLAY</p><h1>Find it.<br /><i>Prove it.</i></h1><p>เกม Web Security Awareness แบบเล่นคนเดียว 5 ด่าน<br />สมัครด้วยอีเมลใดก็ได้ แล้วระบบจะบันทึกคะแนนและความคืบหน้าให้</p><a className="target-button" href="/register">CREATE AN ACCOUNT <span>→</span></a> <a className="ghost-button" href="/login">I ALREADY HAVE ONE</a></section>
+    <section className="answer-intro"><div className="intro-copy"><p className="answer-kicker">MISSION CONTROL / SIGN IN TO PLAY</p><h1>Find it.<br /><i>Prove it.</i></h1><p>เกม Web Security Awareness แบบเล่นคนเดียว<br />5 ด่าน · เล่นตามจังหวะของคุณ</p><a className="target-button" href="/register">CREATE AN ACCOUNT <span>→</span></a> <a className="ghost-button" href="/login">I ALREADY HAVE ONE</a></div><div className="hero-visual"><img src="/hero-breach.svg" alt="" /></div></section>
     <HowToPlayBody />
   </>;
 }
@@ -177,26 +191,33 @@ function StartPanel({ room, stages, busy, onStart, error }: { room: NonNullable<
     <h2>{room.name}</h2>
     {room.description && <p className="question-text">{room.description}</p>}
     <p className="question-text">{stages} challenges · difficulty {room.difficulty}</p>
-    <HowToPlayBody />
+    <HowToPlayBody databaseQuest={room.code === "KKU-DB-QUEST-01"} />
     {error && <p className="answer-status wrong">× {error}</p>}
     <button className="modal-primary" onClick={onStart} disabled={busy}>{busy ? "STARTING…" : "START GAME →"}</button>
   </section>;
 }
 
-function HowToPlayBody() {
+function HowToPlayBody({ databaseQuest = false }: { databaseQuest?: boolean }) {
   return <div className="briefing">
     <ol className="modal-steps">
-      <li><b>เปิด Target Website</b><span>เว็บไซต์มหาวิทยาลัยจำลองที่ <code>/target</code> — ดูเหมือนเว็บธรรมดา แต่มีช่องโหว่ซ่อนอยู่ใน API</span></li>
-      <li><b>เปิด DevTools → Network</b><span>กด F12 (หรือ Ctrl+Shift+I) แล้วดู Request / Response ที่หน้าเว็บส่งออกไป</span></li>
-      <li><b>ทดลองแก้ parameter</b><span>เปลี่ยนค่าใน URL ของ API หรือส่ง Request เองใน tab ใหม่ เพื่อหาข้อมูลที่ไม่ควรเห็น</span></li>
-      <li><b>นำ Flag กลับมาตอบ</b><span>Flag มีรูปแบบ <code>FLAG{"{...}"}</code> ด่านถัดไปจะปลดล็อกเมื่อผ่านด่านก่อนหน้า</span></li>
+      {databaseQuest ? <>
+        <li><b>อ่านโจทย์และระบุแนวคิด</b><span>โจทย์ครอบคลุม ER Model, Keys, Normalization, SQL และ Transactions</span></li>
+        <li><b>คิดคำตอบแบบสั้น</b><span>ตอบเป็นคำศัพท์ ตัวเลข หรือ clause ที่โจทย์ถาม ไม่ต้องกรอก Flag</span></li>
+        <li><b>ใช้ Hint เมื่อติดขัด</b><span>Hint ช่วยชี้แนวทางและหักคะแนนตามที่แสดง</span></li>
+        <li><b>ส่งคำตอบเพื่อเรียนรู้</b><span>เมื่อผ่านจะเห็นคำอธิบาย และปลดล็อกด่านถัดไป</span></li>
+      </> : <>
+        <li><b>เปิด Target Website</b><span>เว็บไซต์มหาวิทยาลัยจำลองที่ <code>/target</code> — ดูเหมือนเว็บธรรมดา แต่มีช่องโหว่ซ่อนอยู่ใน API</span></li>
+        <li><b>เปิด DevTools → Network</b><span>กด F12 (หรือ Ctrl+Shift+I) แล้วดู Request / Response ที่หน้าเว็บส่งออกไป</span></li>
+        <li><b>ทดลองแก้ parameter</b><span>เปลี่ยนค่าใน URL ของ API หรือส่ง Request เองใน tab ใหม่ เพื่อหาข้อมูลที่ไม่ควรเห็น</span></li>
+        <li><b>นำ Flag กลับมาตอบ</b><span>Flag มีรูปแบบ <code>FLAG{"{...}"}</code> ด่านถัดไปจะปลดล็อกเมื่อผ่านด่านก่อนหน้า</span></li>
+      </>}
     </ol>
     <div className="modal-rules"><span>SCORING</span><p>ผ่านด่านได้คะแนนเต็มของด่าน (ปกติ 100) · Hint แต่ละระดับหักคะแนนตามที่ระบุ · คะแนนและเวลาบันทึกบน server</p></div>
-    <p className="modal-note">ทุกช่องโหว่เป็น simulation ภายในโปรเจกต์นี้เท่านั้น ห้ามนำเทคนิคไปใช้กับระบบจริงโดยไม่ได้รับอนุญาต</p>
+    <p className="modal-note">{databaseQuest ? "คะแนนและความคืบหน้าจะบันทึกเมื่อเล่นผ่านระบบ" : "ทุกช่องโหว่เป็น simulation ภายในโปรเจกต์นี้เท่านั้น ห้ามนำเทคนิคไปใช้กับระบบจริงโดยไม่ได้รับอนุญาต"}</p>
   </div>;
 }
 
-function HowToPlay({ onClose }: { onClose: () => void }) {
+function HowToPlay({ onClose, databaseQuest = false }: { onClose: () => void; databaseQuest?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -205,7 +226,7 @@ function HowToPlay({ onClose }: { onClose: () => void }) {
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="how-to-play-title" onClick={e => e.target === e.currentTarget && onClose()}><div className="modal">
     <p className="answer-kicker">BRIEFING / HOW TO PLAY</p>
     <h2 id="how-to-play-title">How to <i>play.</i></h2>
-    <HowToPlayBody />
+    <HowToPlayBody databaseQuest={databaseQuest} />
     <button className="modal-primary" onClick={onClose} autoFocus>BACK TO GAME</button>
   </div></div>;
 }
