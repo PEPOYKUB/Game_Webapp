@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserDetail } from "@/lib/admin";
 import { formatDateTime, formatDuration } from "@/lib/format";
+import LogoutButton from "./LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function ProfilePage() {
   const bestScore = completed.length ? Math.max(...completed.map(session => session.finalScore)) : 0;
 
   return <main className="answer-app profile-page">
-    <header className="answer-nav"><a href="/" className="answer-logo"><span>01</span><div>BREACH / RESPONSE<small>SECURITY AWARENESS CHALLENGE</small></div></a><nav className="answer-links"><a href="/">GAME</a><a href="/leaderboard">LEADERBOARD</a><a href="/profile" aria-current="page">PROFILE</a>{current.role === "ADMIN" && <a href="/admin">ADMIN ↗</a>}<form action="/api/auth/logout" method="post"><button className="nav-action">LOGOUT</button></form></nav></header>
+    <header className="answer-nav"><a href="/" className="answer-logo"><span>01</span><div>BREACH / RESPONSE<small>SECURITY AWARENESS CHALLENGE</small></div></a><nav className="answer-links"><a href="/">GAME</a><a href="/leaderboard">LEADERBOARD</a><a href="/profile" aria-current="page">PROFILE</a>{current.role === "ADMIN" && <a href="/admin">ADMIN ↗</a>}<LogoutButton /></nav></header>
 
     <section className="profile-hero"><div className="profile-avatar-large">{user.firstName.charAt(0)}{user.lastName.charAt(0)}</div><div><p className="answer-kicker">PLAYER PROFILE</p><h1>{user.firstName} <i>{user.lastName}</i></h1><p className="profile-username">@{user.username}</p></div></section>
 
