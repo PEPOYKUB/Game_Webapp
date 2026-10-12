@@ -1,11 +1,10 @@
 import { loadEnvConfig } from "@next/env";
 loadEnvConfig(process.cwd());
 
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../lib/db";
 import bcrypt from "bcryptjs";
 import { PROGRESS_STATUS, ROLE, SESSION_STATUS, USER_STATUS } from "../lib/constants";
 
-const prisma = new PrismaClient();
 const demoPassword = "DemoPass2026!";
 const players = [
   { username: "demo_player_02", roomCode: "KKU-PROG-01", facultyCode: "CP", yearLevel: 1, score: 500, durationMinutes: 11, hintedStages: [] as number[] },

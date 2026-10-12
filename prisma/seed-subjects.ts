@@ -1,9 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../lib/db";
 import { HINT_PENALTY, POINTS_PER_CHALLENGE } from "../lib/challenges";
 import { buildAnswerHash } from "../lib/flags";
 import { DATABASE_QUEST } from "./subject-content";
-
-const prisma = new PrismaClient();
 
 type Counts = { rooms: number; stages: number; puzzles: number; hints: number };
 

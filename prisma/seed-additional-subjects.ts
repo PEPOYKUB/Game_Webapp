@@ -1,12 +1,10 @@
 import { loadEnvConfig } from "@next/env";
 loadEnvConfig(process.cwd());
 
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from "../lib/db";
 import { HINT_PENALTY, POINTS_PER_CHALLENGE } from "../lib/challenges";
 import { buildAnswerHash } from "../lib/flags";
 import { ADDITIONAL_SUBJECTS } from "./additional-subject-content";
-
-const prisma = new PrismaClient();
 
 async function main() {
   for (const roomSpec of ADDITIONAL_SUBJECTS) {
